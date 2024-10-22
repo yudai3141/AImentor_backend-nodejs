@@ -1,0 +1,22 @@
+{
+  "name": "ai_mentor_front",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js"
+  },
+  "author": "Yudai Honda",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-session": "^1.18.1",
+    "helmet": "^8.0.0",
+    "mongodb": "^6.9.0",
+    "mongoose": "^8.7.1",
+    "nodemon": "^3.1.7",
+    "openai": "^4.67.3"
+  }
+}
