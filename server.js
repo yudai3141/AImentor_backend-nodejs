@@ -3,6 +3,7 @@ const app = express();
 const userRoute = require("./routes/users");
 const authRoute = require("./routes/auth");
 const chatRoute = require("./routes/chat");
+const chat2Route = require("./routes/chat2");
 const PORT = 5002; 
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -11,7 +12,13 @@ const path = require("path");
 
 
 app.use(express.json());
-app.use(cors()); 
+
+// CORSミドルウェアの設定
+app.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }));
+
 
 //DB接続
 mongoose.connect(process.env.MONGOURL)
@@ -26,6 +33,7 @@ app.use(express.json());
 app.use("/api/users", userRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/chat", chatRoute);
+app.use("/api/chat2", chat2Route);
 
 app.get("/", (req,res) => {
     res.send("hello express");

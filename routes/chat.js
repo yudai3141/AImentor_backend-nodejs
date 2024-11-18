@@ -1,95 +1,61 @@
 const express = require("express");
 const router = express.Router();
-const OpenAI = require("openai");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
+const mongoose = require("mongoose");
+const { spawn } = require('child_process');
+const path = require('path');
 require("dotenv").config();
 
 // express-sessionのミドルウェアをセットアップ
 router.use(
   session({
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGOURL, // .envファイルからURLを取得
+    }),
     secret: "your_secret_key", // セッションを暗号化するためのキー
-    resave: false,
+    resave: true,
     saveUninitialized: true,
   })
 );
-
-// OpenAIクライアントのインスタンスを作成
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 初回のSystemMessage（GPTの役割を説明する）
-const initialSystemMessage = {
-  role: "system",
-  content: `
-    あなたは、会社の上司の役割を持つアシスタントです。ユーザーが何も知らない前提で、大目標から2,3つの小目標を生成するプロセスを全面的にリードしてください。
-    小目標は1カ月間の想定です。
-    プロセスは以下の手順で行います：
-    1. 大目標に対して、どのような小目標が考えられるかをユーザーに尋ねる。
-    2. ユーザーが提示した小目標が不十分(すぐに達成可能または大目標からの関連性が不明)な場合、新たに小目標を提案する。
-    3. 提示した小目標を踏まえて、ユーザーに決定させる。
-    4. 選ばれた小目標にそれぞれについて、具体的なKPI（目標値）を決める。
-    5. ユーザーに設定した小目標とKPIを確認し、OKかどうかを尋ねる。
-    6. OKであれば終了し、問題があればその理由を考慮してKPI設定に戻る。
-    すべてのプロセスが終了後、'目標設定が完了しました'と出力してください。
-  `,
-};
-
-// タスク分割とKPI生成のリクエスト
-const generateSubGoalsMessage = {
-  role: "system",
-  content: `
-    次に、設定された小目標とKPIの内容をまとめてください。
-    必要のない追加情報は付け加えないでください。
-    以下のフォーマットで出力してください：
-    [
-      { "subgoal": "タスクの割り当て", "KPI": "タスク分担を1週間以内に完了させる" },
-      { "subgoal": "進捗確認", "KPI": "進捗報告を週に2回行う" }
-    ]
-  `,
-};
 
 router.post("/", async (req, res) => {
   const { messages } = req.body; // フロントエンドからのメッセージを受け取る
 
   // セッション内にメッセージ履歴がなければ初期化
   if (!req.session.messages) {
-    req.session.messages = [initialSystemMessage];
+    req.session.messages = []; // 初期化（Python側で初期メッセージを設定）
   }
 
-  const chatMessages =
-    messages.length === 0
-      ? req.session.messages
-      : [...req.session.messages, ...messages];
+  // セッション内のstageやgoal_numが存在しなければ初期化
+  if (req.session.stage === undefined) req.session.stage = 1;
+  if (req.session.goal_num === undefined) req.session.goal_num = 1;
+  if (req.session.sub_goals === undefined) req.session.sub_goals=[];
+  if (req.session.TF_index === undefined) req.session.TF_index=-1;
 
   try {
-    // GPT-3.5のAPIを使用して、まずユーザーの入力に応じた応答を取得
-    const response = await client.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: chatMessages,
-      max_tokens: 400,
-    });
+    // Pythonスクリプトを呼び出してGPTの応答を取得
+    console.log(req.session.sub_goals)
+    console.log(req.session.messages)
+    const gptResponse = await callPythonGPT(messages, req.session.messages, req.session.stage, req.session.goal_num, req.session.sub_goals, req.session.TF_index);
 
-    const gptMessage = response.choices[0].message.content;
+    const gptMessage = gptResponse.response;
+    const generatedSubGoals = gptResponse.subGoals;
 
-    // セッション内のメッセージ履歴に追加
-    req.session.messages.push({ role: "assistant", content: gptMessage });
+    if (gptResponse.stage !== undefined) {
+      req.session.stage = gptResponse.stage;
+    }
+    if (gptResponse.goal_num !== undefined) {
+      req.session.goal_num = gptResponse.goal_num;
+    }
+    if (gptResponse.TF_index !== undefined) {
+      req.session.TF_index = gptResponse.TF_index;
+    }
+    if (gptResponse.subGoals !== undefined) {
+      req.session.sub_goals = gptResponse.subGoals;
+    }
 
-    // 「目標設定が完了しました」というメッセージが含まれている場合、新たにタスク分割リクエストを送信
-    if (gptMessage.includes("目標設定が完了しました")) {
-      req.session.messages.push(generateSubGoalsMessage); // セッションにタスク分割のプロンプトを追加
-
-      const subGoalResponse = await client.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: req.session.messages, // セッション内のメッセージを引き継ぐ
-        max_tokens: 400,
-      });
-
-      const generatedSubGoals = JSON.parse(
-        subGoalResponse.choices[0].message.content
-      );
-      console.log(generatedSubGoals);
-
+    if (gptResponse.isTerminated) {
       // セッションを破棄
       req.session.destroy((err) => {
         if (err) {
@@ -106,11 +72,47 @@ router.post("/", async (req, res) => {
     // 通常の応答を返す
     res.json({ response: gptMessage });
   } catch (error) {
-    console.error("OpenAIとの通信中にエラーが発生しました:", error.message);
+    console.error("Pythonスクリプトとの通信中にエラーが発生しました:", error.message);
     res
       .status(500)
-      .json({ error: "OpenAIとの通信中にエラーが発生しました。" });
+      .json({ error: "Pythonスクリプトとの通信中にエラーが発生しました。" });
   }
 });
+
+async function callPythonGPT(messages, sessionMessages, stage, goalNum, subGoals, TF_index) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, '../gpt_chat.py');
+    const pythonProcess = spawn('python', [scriptPath]);
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdoutData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Pythonスクリプトがコード${code}で終了しました: ${stderrData}`));
+      } else {
+        try {
+          const result = JSON.parse(stdoutData);
+          resolve(result);
+        } catch (e) {
+          reject(new Error(`Pythonスクリプトの出力をパースできませんでした: ${e.message}`));
+        }
+      }
+    });
+
+    // メッセージとセッションメッセージをPythonスクリプトの標準入力に渡す
+    const input = JSON.stringify({ messages, session_messages: sessionMessages, stage, goal_num: goalNum, subGoals, TF_index});
+    pythonProcess.stdin.write(input);
+    pythonProcess.stdin.end();
+  });
+}
 
 module.exports = router;
