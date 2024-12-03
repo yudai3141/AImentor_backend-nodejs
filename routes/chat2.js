@@ -26,8 +26,14 @@ router.post("/", async (req, res) => {
     // クッキーをクライアントに設定
     const setCookieHeader = response.headers['set-cookie'];
     if (setCookieHeader) {
-      res.setHeader('Set-Cookie', setCookieHeader);
-    }
+        if (Array.isArray(setCookieHeader)) {
+          setCookieHeader.forEach((cookie) => {
+            res.append('Set-Cookie', cookie);
+          });
+        } else {
+          res.append('Set-Cookie', setCookieHeader);
+        }
+      }
 
     res.status(response.status).json(response.data);
   } catch (error) {
