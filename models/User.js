@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const TaskSchema = new mongoose.Schema({
     title: { type: String, required: true },
     completed: { type: Boolean, default: false },
-}, { _id: false });
+});
 
 // 短期目標のサブスキーマを定義
 const ShortTermGoalSchema = new mongoose.Schema({
@@ -14,7 +14,7 @@ const ShortTermGoalSchema = new mongoose.Schema({
     tasks: [TaskSchema],  // タスクを子要素として含める
     max_achievement_num: {type: Number},
     current_achievement_num: {type: Number, default: 0 }
-}, { _id: false });
+});
 
 const UserSchema = new mongoose.Schema({
     username: {
