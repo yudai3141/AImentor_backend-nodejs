@@ -448,6 +448,29 @@ def message_to_dict(message):
 
 def initial_system_message_content():
     return """
+大目標：バックエンドエンジニアになる
+
+あなたは、会社の上司の役割を持つアシスタントです。
+このステップでは、ユーザーが何も言語化していない前提で、小目標設定のための現状の理解を促すコーチングを実行してください。
+現状の理解とは、ユーザー自身が今持っているものや目標達成のために何が足りないのかを理解することです。"
+コーチングでは以下の事柄を順守してください:
+・相槌を交える。ではを使わない
+・一度に一つの質問を行う
+・原因や理由について問わない
+・はい・いいえで回答できない具体的かつポジティブな質問をする
+・回答を深掘りする
+以下は現状の理解を促すコーチングの一例です：
+・時間
+・現状目標に対して取り組んでいること
+・頼れる人
+プロセスは以下の手順で行います：
+1. 短い例示を交えながら、現状の理解を促すコーチングを行う。ユーザーが十分な理解が得られるまで繰り返す
+2. OKであれば現状をまとめた後に終了し、問題があればその理由を考慮して上記のプロセスに戻る。
+すべてのプロセスが終了後、'コーチングが完了しました'と出力してください。
+    """
+
+def second_system_message_content():
+    return """
 あなたは、会社の上司の役割を持つアシスタントです。ユーザーが何も知らない前提で、大目標から2つの小目標を生成するプロセスを全面的にリードしてください。
 小目標は1カ月間の想定です。
 プロセスは以下の手順で行います：
@@ -518,7 +541,6 @@ async def chat_endpoint(request: Request, data: GPTRequest):
     client = OpenAI(api_key=openai_api_key)
 
     try:
-        # ステージごとの処理
         if session["stage"] == 1:
             # 初回のシステムメッセージを追加
             if not session_messages:
@@ -527,6 +549,37 @@ async def chat_endpoint(request: Request, data: GPTRequest):
 
             # チャットメッセージを更新
             chat_messages = session_messages + user_langchain_messages
+
+            # OpenAI APIを呼び出す
+            response = chat(chat_messages)
+            gpt_message = response.content
+
+            if '現状把握が完了しました' in gpt_message:
+                try:
+                    session['stage'] = 2  # 次のステージに進む
+                    # 次のステップのメッセージを作成
+                    gpt_message += f"\n次のステップとして、小目標を考えましょう。どのようなものが考えられるでしょうか？"
+
+                except Exception as e:
+                    error_message = f'OpenAI API Error: {str(e)}, stage 1 → 2'
+                    print(json.dumps({'error': error_message}), file=sys.stderr)
+                    sys.exit(1)
+
+            # 応答をセッションに保存
+            session_messages.extend(user_langchain_messages)
+            session_messages.append(AIMessage(content=gpt_message))
+            session["messages"] = [message_to_dict(m) for m in session_messages]
+
+            # セッションデータを保存
+            request.state.session = session
+
+            # レスポンスを返す
+            return JSONResponse({"response": gpt_message, "subGoals": session.get("sub_goals", []), "isTerminated": session["isTerminated"]})
+        elif session["stage"] == 2:
+            # システムメッセージを追加
+            chat_messages = session_messages + [
+                SystemMessage(content=second_system_message_content())
+            ] + user_langchain_messages
 
             # OpenAI APIを呼び出す
             response = chat(chat_messages)
@@ -546,12 +599,12 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                         response_format=ShortTermGoal,
                     )
                     session["sub_goals"] = [{"subGoal": item} for item in completion1.choices[0].message.parsed.shortTermGoals]
-                    session['stage'] = 2  # 次のステージに進む
+                    session['stage'] = 3  # 次のステージに進む
                     # 次のステップのメッセージを作成
                     gpt_message += f"\n次のステップとして、最初の目標である「{session['sub_goals'][0]['subGoal']}」について、KPIを話し合いましょう。どのようなものが考えられるでしょうか？"
 
                 except Exception as e:
-                    error_message = f'OpenAI API Error: {str(e)}, stage 1 → 2'
+                    error_message = f'OpenAI API Error: {str(e)}, stage 2 → 3'
                     print(json.dumps({'error': error_message}), file=sys.stderr)
                     sys.exit(1)
 
@@ -566,8 +619,8 @@ async def chat_endpoint(request: Request, data: GPTRequest):
             # レスポンスを返す
             return JSONResponse({"response": gpt_message, "subGoals": session.get("sub_goals", []), "isTerminated": session["isTerminated"]})
 
-        elif session["stage"] == 2:
-            # ステージ2の処理
+        elif session["stage"] == 3:
+            # ステージ3の処理
             goal_num = session["goal_num"]
             sub_goals = session["sub_goals"]
 
@@ -615,7 +668,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                                     break
 
                             if is_TF_exist:
-                                session["stage"] = 4
+                                session["stage"] = 5
                                 gpt_message += f"\n最後のステップとして、TF目標について、タスク分解を行いましょう。1つ目のTF目標：「{session['sub_goals'][session['TF_index']]['shortTerm_goal']}」について、最小単位の仕事の単位であるタスクに分解していきましょう。どのようなタスクに分解できますか？"
                             else:
                                 # タスク分解が不要な場合は終了
@@ -626,7 +679,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                             gpt_message += f"\n次のステップとして、目標：「{next_goal}」について、KPIを話し合いましょう。どのようなものが考えられるでしょうか？"
 
                     except Exception as e:
-                        error_message = f'OpenAI API Error: {str(e)}, stage 2'
+                        error_message = f'OpenAI API Error: {str(e)}, stage 3'
                         print(json.dumps({'error': error_message}), file=sys.stderr)
                         sys.exit(1)
 
@@ -644,8 +697,8 @@ async def chat_endpoint(request: Request, data: GPTRequest):
             else:
                 return JSONResponse({"error": "小目標が存在しません"}, status_code=400)
 
-        elif session["stage"] == 3:
-            # ステージ3の処理（ステージ2と同様）
+        elif session["stage"] == 4:
+            # ステージ4の処理（ステージ3と同様）
             goal_num = session["goal_num"]
             sub_goals = session["sub_goals"]
 
@@ -689,7 +742,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                                     break
 
                             if is_TF_exist:
-                                session["stage"] = 4
+                                session["stage"] = 5
                                 gpt_message += f"\n最後のステップとして、TF目標について、タスク分解を行いましょう。1つ目のTF目標：「{session['sub_goals'][session['TF_index']]['shortTerm_goal']}」について、最小単位の仕事の単位であるタスクに分解していきましょう。どのようなタスクに分解できますか？"
                             else:
                                 # タスク分解が不要な場合は終了
@@ -700,7 +753,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                             gpt_message += f"\n次のステップとして、目標：「{next_goal}」について、KPIを話し合いましょう。どのようなものが考えられるでしょうか？"
 
                     except Exception as e:
-                        error_message = f'OpenAI API Error: {str(e)}, stage 3'
+                        error_message = f'OpenAI API Error: {str(e)}, stage 4'
                         print(json.dumps({'error': error_message}), file=sys.stderr)
                         sys.exit(1)
 
@@ -718,8 +771,8 @@ async def chat_endpoint(request: Request, data: GPTRequest):
             else:
                 return JSONResponse({"error": "小目標が存在しません"}, status_code=400)
 
-        elif session["stage"] == 4:
-            # ステージ4の処理
+        elif session["stage"] == 5:
+            # ステージ5の処理
             TF_index = session["TF_index"]
             sub_goals = session["sub_goals"]
 
@@ -766,7 +819,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                             session["isTerminated"] = True
 
                     except Exception as e:
-                        error_message = f'OpenAI API Error: {str(e)}, stage 4'
+                        error_message = f'OpenAI API Error: {str(e)}, stage 5'
                         print(json.dumps({'error': error_message}), file=sys.stderr)
                         sys.exit(1)
 
@@ -784,8 +837,8 @@ async def chat_endpoint(request: Request, data: GPTRequest):
             else:
                 return JSONResponse({"error": "TF目標が存在しません"}, status_code=400)
 
-        elif session["stage"] == 5:
-            # ステージ5の処理
+        elif session["stage"] == 6:
+            # ステージ6の処理
             TF_index = session["TF_index"]
             sub_goals = session["sub_goals"]
 
@@ -829,7 +882,7 @@ async def chat_endpoint(request: Request, data: GPTRequest):
                             session["isTerminated"] = True
 
                     except Exception as e:
-                        error_message = f'OpenAI API Error: {str(e)}, stage 5'
+                        error_message = f'OpenAI API Error: {str(e)}, stage 6'
                         print(json.dumps({'error': error_message}), file=sys.stderr)
                         sys.exit(1)
 
