@@ -4,16 +4,27 @@ const mongoose = require("mongoose");
 const TaskSchema = new mongoose.Schema({
     title: { type: String, required: true },
     completed: { type: Boolean, default: false },
+    importance: { type: Number, enum: [1, 2, 3], default: 2 },
+    status: { type: String, enum: ['not_started', 'in_progress', 'completed'], default: 'not_started' }
 });
 
 // 短期目標のサブスキーマを定義
 const ShortTermGoalSchema = new mongoose.Schema({
-    title: { type: String, required: true },
+    shortTerm_goal: { type: String, required: true },
     KPI: { type: String },
-    isNumerical: {type: Boolean},
-    tasks: [TaskSchema],  // タスクを子要素として含める
-    max_achievement_num: {type: Number},
-    current_achievement_num: {type: Number, default: 0 }
+    numerical_or_TF: { type: String, enum: ["numerical", "TF"] },
+    KPI_indicator: { type: Number },
+    weekly_goal_num: {type: Number},
+    current_achievement_num: { type: Number, default: 0 },
+    weekly_goal_num: { type: Number, default: 0 },
+    importance: { type: Number, enum: [1, 2, 3], default: 2 },
+    status: { type: String, enum: ['not_started', 'in_progress', 'completed'], default: 'not_started' },
+    tasks: [TaskSchema],
+    weeklyMeetings: {
+        type: [Boolean],
+        default: [false, false, false, false]
+    },
+    advice: { type: String, default: '' }
 });
 
 const UserSchema = new mongoose.Schema({
@@ -38,11 +49,32 @@ const UserSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
-    shortTerm_goals: [ShortTermGoalSchema],  // 短期目標の配列
+    longTerm_goal_deadline: {
+        type: Date,
+        default: null
+    },
+    shortTerm_goals: [ShortTermGoalSchema],
     isAdmin: {
         type: Boolean,
         default: false,
     },
+    advice: {
+        type: String,
+        default: ''
+    },
+    weeklyAchievements: {
+        week1: { type: Number, default: 0 },
+        week2: { type: Number, default: 0 },
+        week3: { type: Number, default: 0 },
+        week4: { type: Number, default: 0 }
+    },
+    weeklyAvailableTime: {
+        week1: { type: Number, default: 0 },
+        week2: { type: Number, default: 0 },
+        week3: { type: Number, default: 0 },
+        week4: { type: Number, default: 0 }
+    },
+    mainGoalStartDate: Date
 },
 { timestamps: true }
 );

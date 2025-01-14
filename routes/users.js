@@ -44,12 +44,17 @@ router.get("/", async (req, res) => {
       const user = userId
         ? await User.findById(userId)
         : await User.findOne({ username: username });
+      
+    //   console.log("Found user:", user);  // ユーザーデータ全体を確認
+    //   console.log("ShortTerm goals:", user.shortTerm_goals);  // shortTerm_goalsの内容を確認
+      
       const { password, updatedAt, ...other } = user._doc;
       return res.status(200).json(other);
     } catch (err) {
+      console.error("Error in GET /users:", err);  // エラーの詳細を確認
       return res.status(500).json(err);
     }
-  });
+});
 
 
 

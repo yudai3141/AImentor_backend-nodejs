@@ -49,4 +49,34 @@ router.post("/", async (req, res) => {
   }
 });
 
+// アドバイス生成エンドポイント
+router.post("/generate-advice", async (req, res) => {
+  try {
+    console.log("Received request body:", req.body);  // リクエストボディの確認
+    const response = await client.post(
+      'http://localhost:8001/generate-advice',
+      req.body,
+      {
+        headers: {
+          ...req.headers,
+          host: 'localhost:8000',
+        },
+        withCredentials: true,
+      }
+    );
+
+    console.log("Received response from FastAPI:", response.data);  // FastAPIからのレスポンスの確認
+
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error("アドバイス生成中にエラーが発生しました:", error);
+    console.error("Error details:", error.response?.data);  // エラーの詳細を出力
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ error: "アドバイス生成中にエラーが発生しました。" });
+    }
+  }
+});
+
 module.exports = router;
