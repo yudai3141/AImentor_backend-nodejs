@@ -30,6 +30,33 @@ async function updateSchema() {
         }
       });
 
+      // 会話履歴と分析関連のフィールドを追加
+      if (!user.conversation_history) {
+        user.conversation_history = [];
+        isModified = true;
+      }
+      
+      // 分析結果のフィールドを文字列配列型に変更
+      if (!Array.isArray(user.success_experiences)) {
+        user.success_experiences = [];
+        isModified = true;
+      }
+      
+      if (!Array.isArray(user.failure_experiences)) {
+        user.failure_experiences = [];
+        isModified = true;
+      }
+      
+      if (!Array.isArray(user.high_level_insights)) {
+        user.high_level_insights = [];
+        isModified = true;
+      }
+      
+      if (!user.last_analyzed) {
+        user.last_analyzed = null;
+        isModified = true;
+      }
+
       // 変更があった場合のみ保存
       if (isModified) {
         await user.save();

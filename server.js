@@ -2,7 +2,6 @@ const express = require("express");
 const app = express();
 const userRoute = require("./routes/users");
 const authRoute = require("./routes/auth");
-const chatRoute = require("./routes/chat");
 const chat2Route = require("./routes/chat2");
 const weeklyRoute = require("./routes/weekly_chat");
 const PORT = 5002; 
@@ -33,7 +32,6 @@ mongoose.connect(process.env.MONGOURL)
 app.use(express.json());
 app.use("/api/users", userRoute);
 app.use("/api/auth", authRoute);
-app.use("/api/chat", chatRoute);
 app.use("/api/chat2", chat2Route);
 app.use("/api/weekly-chat", weeklyRoute);
 

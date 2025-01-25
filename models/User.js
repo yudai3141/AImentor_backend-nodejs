@@ -74,6 +74,18 @@ const UserSchema = new mongoose.Schema({
         week3: { type: Number, default: 0 },
         week4: { type: Number, default: 0 }
     },
+    conversation_history: [{
+        timestamp: Date,
+        goal: Object,
+        messages: [{
+            role: String,
+            content: String
+        }]
+    }],
+    success_experiences: [String],
+    failure_experiences: [String],
+    high_level_insights: [String],
+    last_analyzed: Date,
     mainGoalStartDate: Date
 },
 { timestamps: true }
