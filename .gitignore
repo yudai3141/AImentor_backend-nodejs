@@ -1,3 +1,20 @@
-.env
 node_modules
-AImentor_env
+npm-debug.log
+.env
+.DS_Store
+*.log
+# 環境変数
+.env*
+!.env.example
+
+# ログ
+logs/
+*.log
+npm-debug.log*
+
+# 依存関係
+node_modules/
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db

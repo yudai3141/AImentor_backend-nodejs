@@ -15,9 +15,11 @@ app.use(express.json());
 
 // CORSミドルウェアの設定
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000", "https://ai-mentor-frontend.vercel.app"],
     credentials: true,
-  }));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 
 //DB接続
@@ -39,5 +41,9 @@ app.get("/", (req,res) => {
     res.send("hello express");
 });
 
+// ポート設定
+const port = process.env.PORT || 8080;
 
-app.listen(PORT, () => console.log("サーバーが起動しました"));
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on port ${port}`);
+});

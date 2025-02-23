@@ -3,21 +3,25 @@ const router = express.Router();
 const axios = require('axios');
 const { wrapper } = require('axios-cookiejar-support');
 const tough = require('tough-cookie');
+const mongoose = require('mongoose');
 
 // axiosインスタンスを作成し、クッキージャーを設定
 const cookieJar = new tough.CookieJar();
 const client = wrapper(axios.create({ jar: cookieJar }));
 
 router.post("/", async (req, res) => {
+  console.log("req.body:", req.body);
+  const userId = req.body.user_id;
+  console.log("userId:", userId);
   try {
     // FastAPIサーバーにリクエストを転送
     const response = await client.post(
-      'http://localhost:8000/api/gpt',
+      `https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/gpt/api/gpt/${req.body.user_id}`,
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'localhost:8000',
+          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
         },
         withCredentials: true,
       }
@@ -36,6 +40,14 @@ router.post("/", async (req, res) => {
       }
 
     res.status(response.status).json(response.data);
+
+    // メンタリングが終了した場合、セッションをクリア
+    if (response.data.isTerminated) {
+      await mongoose.connection
+        .useDb('session_db')
+        .collection(`sessions_${userId}`)
+        .deleteMany({});
+    }
   } catch (error) {
     console.error("FastAPIサーバーとの通信中にエラーが発生しました:", error.message);
     console.error("エラー詳細:", error);
@@ -54,12 +66,12 @@ router.post("/generate-advice", async (req, res) => {
   try {
     console.log("Received request body:", req.body);  // リクエストボディの確認
     const response = await client.post(
-      'http://localhost:8001/generate-advice',
+      'https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/gpt/api/generate-advice',
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'localhost:8000',
+          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
         },
         withCredentials: true,
       }
@@ -76,6 +88,32 @@ router.post("/generate-advice", async (req, res) => {
     } else {
       res.status(500).json({ error: "アドバイス生成中にエラーが発生しました。" });
     }
+  }
+});
+
+// セッション履歴取得エンドポイント
+router.get("/session-history", async (req, res) => {
+  try {
+    // MongoDBから直接最新のセッションを取得
+
+    const sessionData = await mongoose.connection
+      .useDb('session_db')
+      .collection(`sessions_${req.query.user_id}`)
+      .findOne(
+        {},
+        { sort: { _id: -1 } }  // 最新のドキュメントを取得
+      );
+
+    console.log("取得したセッションデータ:", sessionData);
+
+    if (sessionData && sessionData.data) {
+      res.status(200).json(sessionData.data);
+    } else {
+      res.status(200).json({ messages: [] });
+    }
+  } catch (error) {
+    console.error("セッション履歴の取得中にエラーが発生しました:", error);
+    res.status(500).json({ error: "セッション履歴の取得に失敗しました。" });
   }
 });
 

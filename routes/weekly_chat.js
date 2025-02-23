@@ -13,12 +13,12 @@ const client = wrapper(axios.create({ jar: cookieJar }));
 router.post("/start", async (req, res) => {
   try {
     const response = await client.post(
-      'http://localhost:8001/weekly-chat/start',
+      `https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/weekly-chat/weekly-chat/${req.body.goal_num}/${req.body.user_id}`,
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'localhost:8001',
+          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
         },
         withCredentials: true,
       }
@@ -51,12 +51,12 @@ router.post("/start", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const response = await client.post(
-      'http://localhost:8001/weekly-chat',
+      `https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/weekly-chat/weekly-chat/${req.body.goal_num}/${req.body.user_id}`,
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'localhost:8001',
+          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
         },
         withCredentials: true,
       }
@@ -119,12 +119,12 @@ router.put('/users/:userId/weekly-update', async (req, res) => {
 router.post("/generate-advice", async (req, res) => {
   try {
     const response = await client.post(
-      'http://localhost:8001/generate-advice',
+      'https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/weekly-chat/generate-advice',
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'localhost:8001',
+          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
         },
         withCredentials: true,
       }
