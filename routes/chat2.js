@@ -4,6 +4,7 @@ const axios = require('axios');
 const { wrapper } = require('axios-cookiejar-support');
 const tough = require('tough-cookie');
 const mongoose = require('mongoose');
+const { API_ENDPOINTS } = require('../config/constants');
 
 // axiosインスタンスを作成し、クッキージャーを設定
 const cookieJar = new tough.CookieJar();
@@ -16,12 +17,12 @@ router.post("/", async (req, res) => {
   try {
     // FastAPIサーバーにリクエストを転送
     const response = await client.post(
-      `https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/gpt/api/gpt/${req.body.user_id}`,
+      `${API_ENDPOINTS.FASTAPI}/api/gpt/api/gpt/${req.body.user_id}`,
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
+          host: `${API_ENDPOINTS.FASTAPI}`,
         },
         withCredentials: true,
       }
@@ -66,12 +67,12 @@ router.post("/generate-advice", async (req, res) => {
   try {
     console.log("Received request body:", req.body);  // リクエストボディの確認
     const response = await client.post(
-      'https://ai-mentor-fastapi-469976645741.asia-northeast1.run.app/api/gpt/api/generate-advice',
+      `${API_ENDPOINTS.FASTAPI}/api/gpt/api/generate-advice`,
       req.body,
       {
         headers: {
           ...req.headers,
-          host: 'ai-mentor-fastapi-469976645741.asia-northeast1.run.app',
+          host: `${API_ENDPOINTS.FASTAPI}`,
         },
         withCredentials: true,
       }

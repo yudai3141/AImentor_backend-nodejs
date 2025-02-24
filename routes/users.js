@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User")
+const { API_ENDPOINTS } = require('../config/constants');
 
 //　ユーザー情報の更新
 router.put("/:id", async(req,res) => {
